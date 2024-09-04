@@ -1,6 +1,6 @@
 # Autonomous Driving in BeamNG with Real-Time Object Detection
 
-⚠️⚠️This Repository is still under Development. What you are seeing is not final. Changes will be made regarding Code, directories and etc. This repository is in not even in the Alpha stage of development. The Ai Model will be trained soon!⚠️⚠️
+⚠️⚠️This Repository is still under Development. What you are seeing is not final. Changes will be made regarding Code, directories and etc. This repository is in not even in the Alpha stage of development. The Ai Model for the first tests will be trained soon!⚠️⚠️
 
 This project aims to develop an autonomous driving system in BeamNG.drive, leveraging real-time object detection for basic driving tasks, such as lane following, steering, accelerating, and braking. The project uses screenshots captured from the game to train a deep learning model that can detect road lines and control a vehicle in real-time using keypresses.
 
