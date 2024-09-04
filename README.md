@@ -127,3 +127,4 @@ Contributions are welcome! Please fork the repository, create a new branch, and 
 ## License
 
 This project is licensed under the GNU GENERAL PUBLIC LICENSE. See the [LICENSE](LICENSE) file for details.
+
