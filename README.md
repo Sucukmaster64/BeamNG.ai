@@ -127,7 +127,3 @@ Contributions are welcome! Please fork the repository, create a new branch, and 
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
----
-
-Feel free to modify this template according to the specific needs and scope of your project.
