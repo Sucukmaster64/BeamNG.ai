@@ -79,10 +79,14 @@ To collect data for training:
    ```bash
    python data_collection.py
    ```
+   Before running the script, ensure you have a empty directory called `captured_images` in the root folder of this project.
 
-   This script captures screenshots from the BeamNG.drive window whenever a specific key combination is pressed, saving images to the `captured_images` folder.
+   This script captures screenshots from the BeamNG.drive window whenever a specific key combination is pressed, `Ctrl + Shift + s` for saving a picture every 1.5 sec,  `Ctrl + Shift + r` to change the number where it should continue with saving, saving images to the `captured_images` folder.
+   If needed the saving interval can be changed in `data_collection.py`
 
-2. **Organize and Annotate Images**:
+   # EVERYTHING BEYOND THIS STEP IS STILL IN WORK AND NEEDS TO BE TESTED
+
+3. **Organize and Annotate Images**:
 
    Use tools like LabelImg or automated annotation scripts to label the images with road line data.
 
