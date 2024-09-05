@@ -98,6 +98,8 @@ To collect data for training:
 
 2. **Train the Model**:
 
+   **THIS PART OF THE PROJECT IS UNDER DEVELOPMENT AND WILL BE ADDED LATER**
+      
    Run the training script using TensorFlow:
 
    ```bash
@@ -106,7 +108,7 @@ To collect data for training:
 
    This script uses TensorFlow to train an object detection model with the prepared dataset.
 
-3. **Evaluate and Test**:
+2. **Evaluate and Test**:
 
    Test the trained model on a validation set to ensure it can accurately detect road lines.
 
@@ -117,7 +119,7 @@ To collect data for training:
    Use the trained model to control the vehicle in BeamNG.drive:
 
    ```bash
-   python realtime_control.py
+   python ai_driving.py
    ```
 
    This script captures images from the game, uses the model to detect road lines, and sends keypresses to control the vehicle.
