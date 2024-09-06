@@ -79,7 +79,7 @@ To collect data for training:
    ```bash
    python data_collection.py
    ```
-   Before running the script, ensure you have a empty directory called `captured_images` in the root folder of this project.
+   Before running the script, make sure you have a empty directory called `captured_images` in the root folder of this project.
 
    This script captures screenshots from the BeamNG.drive window whenever a specific key combination is pressed, `Ctrl + Shift + s` for saving a picture every 1.5 sec,  `Ctrl + Shift + r` to change the number where it should continue with saving, saving images to the `captured_images` folder.
    If needed the saving interval can be changed in `data_collection.py`
