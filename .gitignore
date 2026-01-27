@@ -4,3 +4,5 @@ venv/
 .venv
 .gitignore/
 gitignore/
+data/
+/data/
