@@ -5,3 +5,4 @@ ENV/
 env/
 .venv
 .gitignore/
+gitignore/
