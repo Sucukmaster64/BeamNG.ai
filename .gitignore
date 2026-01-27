@@ -6,4 +6,6 @@ venv/
 gitignore/
 data/
 /data/
-test-pic.py
+#test-pic.py
+#test-spawn.py
+#test/

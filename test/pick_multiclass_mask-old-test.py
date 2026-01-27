@@ -11,25 +11,35 @@ from beamngpy.sensors import Camera
 
 HOME = r"C:\BeamNG-tech"
 
+#yaw_deg = -171.250
+#yaw_rad = math.radians(yaw_deg)
+
 LEVEL = "west_coast_usa"
 SPAWN_POS = (-717.121, 101.458, 118.675)
 SPAWN_ROT = (0, 0, 0, 1)
+
+#LEVEL = "italy"
+#SPAWN_POS = (1096.203, -434.968, 144.3)
+
+# Roll = 0, Pitch = 0, nur Yaw
+#qx, qy, qz, qw = R.from_euler('xyz', [0, 0, yaw_rad]).as_quat()
+
+#SPAWN_ROT = (qx, qy, qz, qw)
 
 # Speichern an/aus
 SAVE_EVERY_N_FRAMES = 3
 OUT_RAW_DIR = "data/raw"
 OUT_LABEL_DIR = "data/labels"   # Multi-Class Labels (0..N)
 OUT_MASK_DIR = "data/masks"     # Optional: binär (drivable) für Controller
-OUT_LABEL_VIS_DIR = "data/labels_vis"
 
 # Klassen-IDs
-CLASS_OTHER    = 0
-CLASS_ROAD     = 1
-CLASS_SHOULDER = 2
-CLASS_SIDEWALK = 3
-CLASS_TERRAIN  = 4
-CLASS_OBST     = 5
-CLASS_MARKING  = 6
+CLASS_OTHER   = 0
+CLASS_ROAD    = 1
+CLASS_SHOULDER= 2
+CLASS_SIDEWALK= 3
+CLASS_TERRAIN = 4
+CLASS_OBST    = 5
+CLASS_MARKING = 6
 
 # Farben, die du per Klick sammelst (Annotation-RGB)
 colors_by_class = {
@@ -41,7 +51,8 @@ colors_by_class = {
     CLASS_MARKING:  set(),
 }
 
-# Aktuelle Klick-Klasse
+# Welche Klasse wählst du gerade per Klick?
+# Du wechselst später per Tastatur.
 current_class = CLASS_ROAD
 
 
@@ -62,51 +73,18 @@ def to_bgr(arr):
     return arr
 
 
-def remove_color_from_all_classes(rgb):
-    """Entfernt rgb aus allen Klassen."""
-    for cls, s in colors_by_class.items():
-        if rgb in s:
-            s.remove(rgb)
-
-
-def add_color_to_class(rgb, cls):
-    """
-    Fügt rgb der Klasse cls hinzu und entfernt es automatisch aus allen anderen Klassen,
-    damit es keine Überschneidungen geben kann.
-    """
-    remove_color_from_all_classes(rgb)
-    colors_by_class[cls].add(rgb)
-
-
-def remove_color_from_class(rgb, cls):
-    """Entfernt rgb nur aus der gewählten Klasse (falls vorhanden)."""
-    if rgb in colors_by_class[cls]:
-        colors_by_class[cls].remove(rgb)
-        return True
-    return False
-
-
 def on_mouse(event, x, y, flags, param):
     global current_class
+    if event != cv2.EVENT_LBUTTONDOWN:
+        return
 
     ann = param.get("ann")
     if ann is None:
         return
 
     rgb = tuple(ann[y, x, :3].astype(int).tolist())
-
-    # Linksklick: hinzufügen (mit Auto-Remove aus allen anderen Klassen)
-    if event == cv2.EVENT_LBUTTONDOWN:
-        add_color_to_class(rgb, current_class)
-        print(f"ADD {rgb} -> class {current_class} (auto-removed from other classes)")
-
-    # Rechtsklick: entfernen aus aktueller Klasse
-    elif event == cv2.EVENT_RBUTTONDOWN:
-        ok = remove_color_from_class(rgb, current_class)
-        if ok:
-            print(f"REMOVE {rgb} from class {current_class}")
-        else:
-            print(f"NOT FOUND {rgb} in class {current_class}")
+    colors_by_class[current_class].add(rgb)
+    print(f"picked RGB {rgb} -> class {current_class}")
 
 
 def build_label_mask(ann_rgb):
@@ -117,16 +95,9 @@ def build_label_mask(ann_rgb):
     h, w = ann_rgb.shape[:2]
     labels = np.zeros((h, w), dtype=np.uint8)  # default OTHER
 
-    # Wichtig: Reihenfolge = Priorität (höher -> überschreibt niedriger).
-    # Markings und Obstacles sollen niemals als Road/Shoulder enden.
-    priority = [
-        CLASS_MARKING,
-        CLASS_OBST,
-        CLASS_TERRAIN,
-        CLASS_SIDEWALK,
-        CLASS_SHOULDER,
-        CLASS_ROAD,
-    ]
+    # Wichtig: Reihenfolge = Priorität.
+    # Obstacle/Terrain/Sidewalk sollen Road/Shoulder überschreiben, falls Farbe falsch gewählt wurde.
+    priority = [CLASS_OBST, CLASS_TERRAIN, CLASS_SIDEWALK, CLASS_SHOULDER, CLASS_ROAD]
 
     for cls in priority:
         for (r, g, b) in colors_by_class[cls]:
@@ -149,35 +120,29 @@ def colorize_labels(lbl):
     vis[lbl == CLASS_SIDEWALK] = (255, 0, 0)      # blau
     vis[lbl == CLASS_TERRAIN]  = (0, 128, 0)      # dunkelgrün
     vis[lbl == CLASS_OBST]     = (0, 0, 255)      # rot
-    vis[lbl == CLASS_MARKING]  = (255, 255, 255)  # weiß (Markierungen auffällig)
     # OTHER bleibt schwarz
     return vis
 
 
 def drivable_from_labels(lbl, allow_shoulder=False):
     """
-    Binäre Drivable-Maske für Debug/Controller.
-    WICHTIG: MARKING bleibt IMMER undrivable, egal ob Shoulder erlaubt ist.
+    Erstellt optional eine binäre Drivable-Maske für Controller/Debug.
     """
     if allow_shoulder:
         m = (lbl == CLASS_ROAD) | (lbl == CLASS_SHOULDER)
     else:
         m = (lbl == CLASS_ROAD)
-
-    # Markierungen niemals befahrbar
-    m = m & (lbl != CLASS_MARKING)
-
     return (m.astype(np.uint8) * 255)
 
 
 def main():
+    os.makedirs("data/labels_vis", exist_ok=True)
     SAVE = False
-    ALLOW_SHOULDER_AS_DRIVABLE = False  # Taste 'h' toggelt
+    ALLOW_SHOULDER_AS_DRIVABLE = False  # taste 'h' toggelt
 
     os.makedirs(OUT_RAW_DIR, exist_ok=True)
     os.makedirs(OUT_LABEL_DIR, exist_ok=True)
     os.makedirs(OUT_MASK_DIR, exist_ok=True)
-    os.makedirs(OUT_LABEL_VIS_DIR, exist_ok=True)
 
     bng = BeamNGpy("localhost", 64256, home=HOME)
     bng.open()
@@ -206,10 +171,9 @@ def main():
     )
 
     print("Multi-class picking:")
-    print("Linksklick in 'Annotation' = Farbe zur aktuellen Klasse hinzufügen (auto-remove aus anderen Klassen).")
-    print("Rechtsklick in 'Annotation' = Farbe aus aktueller Klasse entfernen.")
-    print("Keys: 1=ROAD 2=SHOULDER 3=SIDEWALK 4=TERRAIN 5=OBSTACLE 6=MARKING")
-    print("c=print colors, s=toggle saving, h=toggle shoulder-as-drivable, ESC=quit")
+    print("Left-click in 'Annotation' to add the pixel color to the current class.")
+    print("Keys: 1=ROAD 2=SHOULDER 3=SIDEWALK 4=TERRAIN 5=OBSTACLE")
+    print("c=print current color sets, s=toggle saving, h=toggle shoulder-as-drivable, ESC=quit")
 
     time.sleep(2)
 
@@ -242,7 +206,7 @@ def main():
         lbl_vis = colorize_labels(lbl)
         cv2.imshow("Labels (visual)", lbl_vis)
 
-        # Optional: binäre Drivable-Maske
+        # Optional: binäre Drivable-Maske für Debug/Controller
         drv = drivable_from_labels(lbl, allow_shoulder=ALLOW_SHOULDER_AS_DRIVABLE)
         cv2.imshow("Drivable (derived)", drv)
 
@@ -267,9 +231,6 @@ def main():
         elif key == ord("5"):
             current_class = CLASS_OBST
             print("current class = OBSTACLE (5)")
-        elif key == ord("6"):
-            current_class = CLASS_MARKING
-            print("current class = MARKING (6)")
 
         elif key == ord("h"):
             ALLOW_SHOULDER_AS_DRIVABLE = not ALLOW_SHOULDER_AS_DRIVABLE
@@ -277,7 +238,7 @@ def main():
 
         elif key == ord("c"):
             print("\nCollected colors:")
-            for cls in [CLASS_ROAD, CLASS_SHOULDER, CLASS_SIDEWALK, CLASS_TERRAIN, CLASS_OBST, CLASS_MARKING]:
+            for cls in [CLASS_ROAD, CLASS_SHOULDER, CLASS_SIDEWALK, CLASS_TERRAIN, CLASS_OBST]:
                 print(f"class {cls}: {sorted(colors_by_class[cls])}")
 
         elif key == ord("s"):
@@ -288,10 +249,11 @@ def main():
         if SAVE and (frame_idx % SAVE_EVERY_N_FRAMES == 0):
             fid = f"{int(time.time() * 1000)}"
             cv2.imwrite(os.path.join(OUT_RAW_DIR, f"{fid}.png"), colour[:, :, :3])
-            cv2.imwrite(os.path.join(OUT_LABEL_DIR, f"{fid}.png"), lbl)   # 0..6 als PNG
+            cv2.imwrite(os.path.join(OUT_LABEL_DIR, f"{fid}.png"), lbl)   # 0..5 als PNG
             cv2.imwrite(os.path.join(OUT_MASK_DIR, f"{fid}.png"), drv)    # optional binär
-            cv2.imwrite(os.path.join(OUT_LABEL_VIS_DIR, f"{fid}.png"), lbl_vis)
-            print(f"saved {fid}.png (raw/label/mask/labels_vis)")
+            lbl_vis = colorize_labels(lbl)  # farbige Vorschau (BGR)
+            cv2.imwrite(os.path.join("data/labels_vis", f"{fid}.png"), lbl_vis)
+            print(f"saved {fid}.png (raw/label/mask)")
 
         frame_idx += 1
 
