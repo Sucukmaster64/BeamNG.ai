@@ -2,7 +2,8 @@
 .venv/
 venv/
 .venv
-.gitignore/
+.gitignore
 gitignore/
 data/
 /data/
+test-pic.py

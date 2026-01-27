@@ -120,6 +120,7 @@ def drivable_from_labels(lbl, allow_shoulder=False):
 
 
 def main():
+    os.makedirs("data/labels_vis", exist_ok=True)
     SAVE = False
     ALLOW_SHOULDER_AS_DRIVABLE = False  # taste 'h' toggelt
 
@@ -234,6 +235,8 @@ def main():
             cv2.imwrite(os.path.join(OUT_RAW_DIR, f"{fid}.png"), colour[:, :, :3])
             cv2.imwrite(os.path.join(OUT_LABEL_DIR, f"{fid}.png"), lbl)   # 0..5 als PNG
             cv2.imwrite(os.path.join(OUT_MASK_DIR, f"{fid}.png"), drv)    # optional binär
+            lbl_vis = colorize_labels(lbl)  # farbige Vorschau (BGR)
+            cv2.imwrite(os.path.join("data/labels_vis", f"{fid}.png"), lbl_vis)
             print(f"saved {fid}.png (raw/label/mask)")
 
         frame_idx += 1
