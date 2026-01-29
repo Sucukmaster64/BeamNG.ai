@@ -3,6 +3,7 @@ import time
 import cv2
 import math
 import numpy as np
+import json
 
 from scipy.spatial.transform import Rotation as R
 
@@ -11,9 +12,12 @@ from beamngpy.sensors import Camera
 
 HOME = r"C:\BeamNG-tech"
 
+
 LEVEL = "west_coast_usa"
 SPAWN_POS = (-717.121, 101.458, 118.675)
 SPAWN_ROT = (0, 0, 0, 1)
+
+COLOR_PRESET_PATH = os.path.join("configs", f"colors_{LEVEL}.json")
 
 # Speichern an/aus
 SAVE_EVERY_N_FRAMES = 3
@@ -170,6 +174,42 @@ def drivable_from_labels(lbl, allow_shoulder=False):
     return (m.astype(np.uint8) * 255)
 
 
+def load_colors_from_json(path):
+    """
+    Lädt Farben aus JSON und überschreibt colors_by_class.
+    JSON Format: {"1": [[r,g,b], ...], "2": [...], ...}
+    """
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Preset file not found: {path}")
+
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    # Alles leeren
+    for cls in colors_by_class.keys():
+        colors_by_class[cls].clear()
+
+    # Laden
+    for k, cols in data.items():
+        cls = int(k)
+        if cls not in colors_by_class:
+            continue
+        for c in cols:
+            colors_by_class[cls].add(tuple(int(x) for x in c))
+
+
+def save_colors_to_json(path):
+    """
+    Speichert colors_by_class in JSON.
+    """
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    out = {}
+    for cls, s in colors_by_class.items():
+        out[str(cls)] = [list(map(int, rgb)) for rgb in sorted(s)]
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(out, f, indent=2)
+
+
 def main():
     SAVE = False
     ALLOW_SHOULDER_AS_DRIVABLE = False  # Taste 'h' toggelt
@@ -178,6 +218,13 @@ def main():
     os.makedirs(OUT_LABEL_DIR, exist_ok=True)
     os.makedirs(OUT_MASK_DIR, exist_ok=True)
     os.makedirs(OUT_LABEL_VIS_DIR, exist_ok=True)
+
+    # (3) Preset beim Start laden (falls vorhanden)
+    try:
+        load_colors_from_json(COLOR_PRESET_PATH)
+        print(f"Loaded color preset from: {COLOR_PRESET_PATH}")
+    except FileNotFoundError:
+        print(f"No preset found at {COLOR_PRESET_PATH}. Click colours to create one, then press 'p' to save.")
 
     bng = BeamNGpy("localhost", 64256, home=HOME)
     bng.open()
@@ -209,7 +256,7 @@ def main():
     print("Linksklick in 'Annotation' = Farbe zur aktuellen Klasse hinzufügen (auto-remove aus anderen Klassen).")
     print("Rechtsklick in 'Annotation' = Farbe aus aktueller Klasse entfernen.")
     print("Keys: 1=ROAD 2=SHOULDER 3=SIDEWALK 4=TERRAIN 5=OBSTACLE 6=MARKING")
-    print("c=print colors, s=toggle saving, h=toggle shoulder-as-drivable, ESC=quit")
+    print("c=print colors, p=save preset, r=reload preset, s=toggle saving, h=toggle shoulder-as-drivable, ESC=quit")
 
     time.sleep(2)
 
@@ -280,6 +327,15 @@ def main():
             for cls in [CLASS_ROAD, CLASS_SHOULDER, CLASS_SIDEWALK, CLASS_TERRAIN, CLASS_OBST, CLASS_MARKING]:
                 print(f"class {cls}: {sorted(colors_by_class[cls])}")
 
+        # (4) Preset speichern / neu laden
+        elif key == ord("p"):
+            save_colors_to_json(COLOR_PRESET_PATH)
+            print(f"Saved preset to: {COLOR_PRESET_PATH}")
+
+        elif key == ord("r"):
+            load_colors_from_json(COLOR_PRESET_PATH)
+            print(f"Reloaded preset: {COLOR_PRESET_PATH}")
+
         elif key == ord("s"):
             SAVE = not SAVE
             print(f"Saving: {SAVE}")
@@ -301,3 +357,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
