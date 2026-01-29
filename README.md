@@ -1,7 +1,7 @@
 # BeamNG.ai – Realtime Drivable Area Segmentation
 
 <p align="center">
-  <img src="assets/beamng_tech_logo.png" alt="BeamNG.tech Logo" width="420"/>
+  <img src="assets/Drive-Logo-White.png" alt="BeamNG.tech Logo" width="420"/>
 </p>
 
 ## Overview
