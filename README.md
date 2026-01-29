@@ -1,3 +1,5 @@
+![Drive Logo](assets/Drive-Logo-White.png)
+
 # BeamNG.ai — Realtime Drivable Area Perception
 
 BeamNG.ai is a research-oriented project that focuses on **realtime semantic perception for autonomous driving** using the BeamNG.tech simulator.  
