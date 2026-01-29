@@ -1,0 +1,1 @@
+python -m src.ml.train_seg --model enet --img-size 288 512 --batch-size 16 --epochs 30 && tensorboard --logdir runs

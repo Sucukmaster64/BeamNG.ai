@@ -9,6 +9,9 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Dict, Tuple
 
+from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -107,12 +110,16 @@ def train_one_epoch(
     device: torch.device,
     scheduler=None,
     amp: bool = True,
+    epoch: int = 1,
+    log_every: int = 50,
+    writer: SummaryWriter | None = None,
 ) -> float:
     model.train()
     running = 0.0
     n = 0
 
-    for batch in loader:
+    pbar = tqdm(loader, desc=f"train e{epoch}", ncols=110, leave=False)
+    for step, batch in enumerate(pbar, start=1):
         x = batch["image"].to(device, non_blocking=True)
         y = batch["label"].to(device, non_blocking=True)
 
@@ -129,8 +136,19 @@ def train_one_epoch(
         if scheduler is not None:
             scheduler.step()
 
-        running += float(loss.item()) * x.size(0)
-        n += x.size(0)
+        bs = x.size(0)
+        running += float(loss.item()) * bs
+        n += bs
+
+        avg = running / max(1, n)
+        lr = optimizer.param_groups[0]["lr"]
+        pbar.set_postfix(loss=f"{avg:.4f}", lr=f"{lr:.2e}")
+
+        # optional per-step logging to TensorBoard
+        if writer is not None and (step % log_every == 0):
+            global_step = (epoch - 1) * len(loader) + step
+            writer.add_scalar("loss/train_step", float(loss.item()), global_step)
+            writer.add_scalar("lr/step", lr, global_step)
 
     return running / max(1, n)
 
@@ -144,6 +162,7 @@ def validate(
     num_classes: int,
     ignore_index: int,
     amp: bool = True,
+    epoch: int = 1,
 ) -> Tuple[float, float, Dict[int, float]]:
     model.eval()
     running = 0.0
@@ -151,7 +170,8 @@ def validate(
 
     cm_total = torch.zeros((num_classes, num_classes), dtype=torch.int64, device="cpu")
 
-    for batch in loader:
+    pbar = tqdm(loader, desc=f"val   e{epoch}", ncols=110, leave=False)
+    for batch in pbar:
         x = batch["image"].to(device, non_blocking=True)
         y = batch["label"].to(device, non_blocking=True)
 
@@ -159,12 +179,16 @@ def validate(
             logits = model(x)
             loss = criterion(logits, y)
 
-        running += float(loss.item()) * x.size(0)
-        n += x.size(0)
+        bs = x.size(0)
+        running += float(loss.item()) * bs
+        n += bs
 
         pred = torch.argmax(logits, dim=1).to(torch.int64)
         cm = confusion_matrix(pred.cpu(), y.cpu(), num_classes=num_classes, ignore_index=ignore_index)
         cm_total += cm
+
+        avg = running / max(1, n)
+        pbar.set_postfix(loss=f"{avg:.4f}")
 
     val_loss = running / max(1, n)
     miou, per_class = compute_iou(cm_total)
@@ -232,6 +256,8 @@ def main():
     run_id = time.strftime("%Y%m%d_%H%M%S")
     run_dir = Path("runs") / f"{args.model}_{run_id}"
     run_dir.mkdir(parents=True, exist_ok=True)
+    writer = SummaryWriter(log_dir=str(run_dir))
+
 
     # Save config
     cfg = {
@@ -250,8 +276,8 @@ def main():
 
     for epoch in range(1, args.epochs + 1):
         t0 = time.time()
-        tr_loss = train_one_epoch(model, train_loader, optimizer, scaler, criterion, device, scheduler=scheduler, amp=amp)
-        val_loss, miou, per = validate(model, val_loader, criterion, device, num_classes, args.ignore_index, amp=amp)
+        tr_loss = train_one_epoch(model, train_loader, optimizer, scaler, criterion, device, scheduler=scheduler, amp=amp, epoch=epoch, log_every=50, writer=writer)
+        val_loss, miou, per = validate(model, val_loader, criterion, device, num_classes, args.ignore_index, amp=amp, epoch=epoch)
         dt = time.time() - t0
 
         # Log
@@ -261,6 +287,22 @@ def main():
             f"time={dt:.1f}s"
         )
         print(msg)
+
+        # Scalars
+        writer.add_scalar("loss/train", tr_loss, epoch)
+        writer.add_scalar("loss/val", val_loss, epoch)
+        writer.add_scalar("metrics/miou", miou, epoch)
+
+        # LR (OneCycle ändert LR pro Step; wir loggen den aktuellen)
+        current_lr = optimizer.param_groups[0]["lr"]
+        writer.add_scalar("lr", current_lr, epoch)
+
+        # Per-class IoU
+        for cls_id, v in per.items():
+            writer.add_scalar(f"iou/class_{cls_id}", v, epoch)
+
+        writer.flush()
+
 
         # Save last
         save_checkpoint(run_dir / "last.pt", {
@@ -298,6 +340,7 @@ def main():
 
     print(f"[DONE] Best mIoU: {best_miou:.4f}")
     print(f"[DONE] Artifacts in: {run_dir}")
+    writer.close()
 
 
 if __name__ == "__main__":
